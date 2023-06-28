@@ -1,22 +1,48 @@
 import { getLibs } from '../../scripts/utils.js';
 
+const {
+  html,
+  render,
+  useEffect,
+  useState,
+} = await import(`${getLibs()}/deps/htm-preact.js`);
+
+function Dog({ heading }) {
+  return html`<li><h3>${heading}</h3></li>`;
+}
+
+function Bloglist({ json }) {
+  const [count, setCount] = useState(0);
+  const [dogData, setDogData] = useState([]);
+
+  useEffect(async () => {
+    const dogs = [];
+    for (const post of json.data) {
+      const resp = await fetch(`${post.path}.plain.html`);
+      if (!resp.ok) return;
+      const respHtml = await resp.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(respHtml, 'text/html');
+      const heading = doc.querySelector('h1, h2, h3, h4, h5, p');
+      dogs.push(heading.textContent);
+    }
+    setCount(dogs.length);
+    setDogData(dogs);
+  }, []);
+
+  return html`
+    <h2>DOOOOGGGGS</h2>
+    <h4>Count: ${count}</h4>
+    <ul>
+    ${dogData.map((heading) => html`<${Dog} heading=${heading} />`)}
+    </ul>`;
+}
+
+
 export default async function init(el) {
-  const { createTag } = await import(`${getLibs()}/utils/utils.js`);
   const qResp = await fetch('/blog/query-index.json');
   if (!qResp.ok) return;
-  const list = createTag('ul', { class: 'blog-list-container' });
   const qJson = await qResp.json();
-  qJson.data.forEach(async (post) => {
-    const li = createTag('li', { class: 'blog-list-item' });
-    list.append(li);
-    const resp = await fetch(`${post.path}.plain.html`);
-    if (!resp.ok) return;
-    const html = await resp.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const heading = doc.querySelector('h1, h2, h3, h4, h5, p').textContent;
-    const h2 = createTag('h2', {}, heading);
-    li.append(h2);
-  });
-  el.append(list);
+
+  render(html`<${Bloglist} json=${qJson}  />`, el);
 }
